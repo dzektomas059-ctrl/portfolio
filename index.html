@@ -307,6 +307,56 @@
     .showcase .head{padding:6vh 6vw 0;margin-bottom:40px;}
     .about .manifesto{gap:.28em .28em;}
   }
+
+  .marquee-wall{
+    max-height:0;overflow:hidden;opacity:0;
+    transition:max-height .7s ease,opacity .7s ease;
+    background:var(--bg);padding:0;
+  }
+  .marquee-wall.open{max-height:2600px;opacity:1;}
+  .marquee-row{
+    display:flex;overflow:hidden;padding:14px 0;
+    -webkit-mask-image:linear-gradient(to right,transparent,#000 8%,#000 92%,transparent);
+    mask-image:linear-gradient(to right,transparent,#000 8%,#000 92%,transparent);
+  }
+  .marquee-half{flex:1;min-width:0;overflow:hidden;}
+  .marquee-track{
+    display:flex;gap:16px;flex-shrink:0;will-change:transform;
+  }
+  .marquee-thumb{
+    width:240px;height:155px;border-radius:14px;overflow:hidden;
+    position:relative;flex-shrink:0;
+    background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:0 10px 30px rgba(0,0,0,.4);
+    cursor:pointer;
+  }
+  .marquee-thumb .img{
+    position:absolute;inset:0;
+    background-size:cover;background-position:center;
+    transition:transform .6s cubic-bezier(.16,1,.3,1);
+  }
+  .marquee-thumb:hover .img{transform:scale(1.05);}
+  .marquee-thumb .label{
+    position:absolute;left:0;right:0;bottom:0;
+    padding:10px 14px;
+    background:linear-gradient(to top,rgba(5,5,5,.94),transparent);
+    font-size:11px;letter-spacing:.05em;color:var(--platinum);
+    opacity:0;transition:opacity .3s ease;
+  }
+  .marquee-thumb:hover .label{opacity:1;}
+  @media (prefers-reduced-motion:no-preference){
+    .marquee-track.loop{animation:marquee 100s linear infinite;}
+    .marquee-track.loop.reverse{animation-direction:reverse;}
+  }
+  @keyframes marquee{
+    from{transform:translateX(0)}
+    to{transform:translateX(-50%)}
+  }
+
+  @media (max-width:768px){
+    .marquee-row{flex-direction:column;gap:0;}
+  }
 </style>
 </head>
 <body>
@@ -430,6 +480,8 @@
   <div class="showcase-footer">
     <button class="magnet-btn" data-hover>Смотреть все проекты</button>
   </div>
+
+  <div id="allProjectsMarquee" class="marquee-wall"></div>
 
   
   <section class="contact" id="contact">
@@ -655,7 +707,6 @@ function buildShowcase(){
 window.addEventListener('resize',()=>{ ScrollTrigger.refresh(); });
 
 const showAllBtn = document.querySelector('.showcase-footer .magnet-btn');
-let allShown = false;
 let hiddenCards = [];
 
 if (showAllBtn) {
@@ -668,27 +719,78 @@ if (showAllBtn) {
   }
 
   showAllBtn.addEventListener('click', function() {
-    if (allShown || hiddenCards.length === 0) return;
-    allShown = true;
-    const isMobile = window.innerWidth <= 768;
-    hiddenCards.forEach((c, i) => {
-      c.style.display = '';
-      gsap.from(c, {
-        opacity: 0, scale: isMobile ? 1 : 0.92,
-        y: isMobile ? 40 : 0,
-        duration: 0.7, delay: i * 0.12, ease: 'power3.out'
-      });
-    });
-    const totalDelay = hiddenCards.length * 120 + 800;
-    setTimeout(() => {
-      buildShowcase();
-      ScrollTrigger.refresh();
-      lenis.scrollTo('#work', { duration: 1.2, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)) });
-    }, totalDelay);
-    gsap.to(this, { opacity: 0.5, duration: 0.4 });
+    if (this.dataset.shown) return;
+    this.dataset.shown = 'true';
+    const wall = document.getElementById('allProjectsMarquee');
+    if (!wall) return;
+    if (!wall.children.length) buildMarquee(wall);
+    wall.classList.add('open');
     this.textContent = 'Все проекты ✓';
     this.style.pointerEvents = 'none';
+    gsap.to(this, { opacity: 0.5, duration: 0.4 });
   });
+}
+
+function buildMarquee(wall) {
+  const cards = Array.from(document.querySelectorAll('#track .card'));
+  const projects = cards.map(c => ({
+    img: c.querySelector('.img').getAttribute('data-src'),
+    title: c.querySelector('h3').textContent,
+    desc: c.querySelector('p').textContent
+  }));
+  const pool = [];
+  for (let r = 0; r < 5; r++) {
+    projects.forEach((p, i) => pool.push({ ...p, idx: i }));
+  }
+  const full = pool.concat(pool);
+
+  function makeTrack(list, dir) {
+    const t = document.createElement('div');
+    t.className = 'marquee-track loop' + (dir === 'r' ? '' : ' reverse');
+    list.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'marquee-thumb';
+      const im = document.createElement('div');
+      im.className = 'img';
+      im.style.backgroundImage = 'url("' + item.img + '")';
+      el.appendChild(im);
+      const lb = document.createElement('div');
+      lb.className = 'label';
+      lb.textContent = item.title;
+      el.appendChild(lb);
+      el.addEventListener('click', function () {
+        openModal('url("' + item.img + '")', item.title, item.desc);
+      });
+      t.appendChild(el);
+    });
+    return t;
+  }
+
+  var r1 = document.createElement('div');
+  r1.className = 'marquee-row';
+  r1.appendChild(makeTrack(full, 'l'));
+  wall.appendChild(r1);
+
+  var r2 = document.createElement('div');
+  r2.className = 'marquee-row';
+  var hL = document.createElement('div');
+  hL.className = 'marquee-half';
+  hL.style.WebkitMaskImage = 'linear-gradient(to right,transparent,#000 8%,#000 92%,transparent)';
+  hL.style.maskImage = 'linear-gradient(to right,transparent,#000 8%,#000 92%,transparent)';
+  hL.appendChild(makeTrack(full, 'l'));
+  r2.appendChild(hL);
+  var hR = document.createElement('div');
+  hR.className = 'marquee-half';
+  hR.style.WebkitMaskImage = 'linear-gradient(to right,transparent,#000 8%,#000 92%,transparent)';
+  hR.style.maskImage = 'linear-gradient(to right,transparent,#000 8%,#000 92%,transparent)';
+  hR.appendChild(makeTrack(full, 'r'));
+  r2.appendChild(hR);
+  wall.appendChild(r2);
+
+  var r3 = document.createElement('div');
+  r3.className = 'marquee-row';
+  r3.appendChild(makeTrack(full, 'r'));
+  wall.appendChild(r3);
 }
 
 buildShowcase();
