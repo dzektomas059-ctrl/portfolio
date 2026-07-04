@@ -615,9 +615,15 @@ const imgs  = track.querySelectorAll('.card .img');
 const totalScroll = ()=> track.scrollWidth - window.innerWidth;
 
 let scrollTween = null;
+let showcaseTriggers = [];
+
 function buildShowcase(){
-  if(scrollTween) scrollTween.kill();
-  if(window.innerWidth <= 768) return;
+  if (scrollTween) { scrollTween.kill(); scrollTween = null; }
+  showcaseTriggers.forEach(st => st.kill());
+  showcaseTriggers = [];
+
+  if (window.innerWidth <= 768) return;
+
   scrollTween = gsap.to(track,{
     x: ()=> -totalScroll(),
     ease:'none',
@@ -628,19 +634,24 @@ function buildShowcase(){
       scrub:1,pin:true,anticipatePin:1,invalidateOnRefresh:true,
     }
   });
+
   cards.forEach(card=>{
-    gsap.fromTo(card.querySelectorAll('.meta'),{y:60,opacity:0},{
+    if (card.style.display === 'none') return;
+    const tw = gsap.fromTo(card.querySelectorAll('.meta'),{y:60,opacity:0},{
       y:0,opacity:1,
       scrollTrigger:{trigger:card,containerAnimation:scrollTween,start:'left 80%',end:'left 40%',scrub:true}
     });
+    if (tw.scrollTrigger) showcaseTriggers.push(tw.scrollTrigger);
   });
   imgs.forEach(img=>{
-    gsap.fromTo(img,{xPercent:-8},{xPercent:8,ease:'none',
+    if (img.closest('.card').style.display === 'none') return;
+    const tw = gsap.fromTo(img,{xPercent:-8},{xPercent:8,ease:'none',
       scrollTrigger:{trigger:img.parentElement,containerAnimation:scrollTween,start:'left right',end:'right left',scrub:true}
     });
+    if (tw.scrollTrigger) showcaseTriggers.push(tw.scrollTrigger);
   });
 }
-buildShowcase();
+
 window.addEventListener('resize',()=>{ ScrollTrigger.refresh(); });
 
 const showAllBtn = document.querySelector('.showcase-footer .magnet-btn');
@@ -652,8 +663,6 @@ if (showAllBtn) {
   if (projectCards.length > 4) {
     hiddenCards = projectCards.slice(4);
     hiddenCards.forEach(c => { c.style.display = 'none'; });
-    buildShowcase();
-    ScrollTrigger.refresh();
   } else {
     showAllBtn.style.display = 'none';
   }
@@ -681,6 +690,8 @@ if (showAllBtn) {
     this.style.pointerEvents = 'none';
   });
 }
+
+buildShowcase();
 
 
 gsap.utils.toArray('.showcase .head, .contact h2, .contact .label, .contact .form').forEach(el=>{
